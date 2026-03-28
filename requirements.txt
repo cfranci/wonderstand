@@ -1,0 +1,10 @@
+lightning-whisper-mlx
+mlx-vlm
+mlx
+mlx-lm
+av
+numpy
+Pillow
+tqdm
+opencv-python
+pyannote.audio

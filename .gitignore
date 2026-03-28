@@ -1,0 +1,34 @@
+# Environment & secrets
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+
+# Model cache
+mlx_models/
+.cache/
+
+# Output
+output/
+
+# macOS
+.DS_Store
+
+# Test/media files
+*.mov
+*.mp4
+*.m4a
+*.qta
+
+# Personal data
+inbox/
+voice_profiles/profiles.json
+.uploaded_memos
+com.wonderstand.ingest.plist
+upload_new_memos.sh
