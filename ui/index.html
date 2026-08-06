@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wonderstand · Voices</title>
+<style>
+  :root{
+    --bg:#0d0f10; --panel:#15181a; --panel2:#1c2023; --line:#282d31;
+    --ink:#e9e6df; --dim:#8b9198; --faint:#5a6167;
+    --amber:#e8a34a; --amber2:#f2c078; --green:#5bb98b; --blue:#6ba7d6;
+    --known:#5bb98b; --unknown:#b06b5a;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--amber2);text-decoration:none}
+  .app{display:grid;grid-template-columns:288px 1fr;height:100vh}
+  /* sidebar */
+  .side{border-right:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0}
+  .brand{padding:20px 20px 14px;display:flex;align-items:baseline;gap:9px}
+  .brand h1{font-size:16px;letter-spacing:.14em;text-transform:uppercase;margin:0;font-weight:600}
+  .brand .dot{color:var(--amber)}
+  .brand small{color:var(--faint);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
+  .side h2{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+    margin:18px 20px 8px;font-weight:600}
+  .people{overflow-y:auto;padding:0 12px 12px;min-height:0}
+  .person{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:9px;
+    cursor:pointer;border:1px solid transparent}
+  .person:hover{background:var(--panel2)}
+  .person.active{background:var(--panel2);border-color:var(--line)}
+  .avatar{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-weight:600;font-size:12px;color:#0d0f10}
+  .person .meta{min-width:0;flex:1}
+  .person .nm{font-weight:600;display:flex;align-items:center;gap:6px}
+  .person .sub{color:var(--faint);font-family:var(--mono);font-size:11px}
+  .person .cnt{color:var(--dim);font-family:var(--mono);font-size:12px}
+  .allrow{margin:2px 0 6px}
+  .rename-btn{opacity:0;font-size:11px;color:var(--faint);border:none;background:none;cursor:pointer}
+  .person:hover .rename-btn{opacity:1}
+  .side-foot{margin-top:auto;padding:14px 20px;border-top:1px solid var(--line);
+    color:var(--faint);font-family:var(--mono);font-size:11px}
+  /* main */
+  .main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .top{padding:16px 24px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center}
+  .search{flex:1;position:relative}
+  .search input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:11px 14px 11px 38px;color:var(--ink);font-size:14px;font-family:var(--sans)}
+  .search input:focus{outline:none;border-color:var(--amber)}
+  .search svg{position:absolute;left:12px;top:11px;color:var(--faint)}
+  .filterchip{display:none;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:20px;padding:6px 8px 6px 12px;font-size:13px;white-space:nowrap}
+  .filterchip b{color:var(--amber2)}
+  .filterchip button{border:none;background:none;color:var(--dim);cursor:pointer;font-size:15px;line-height:1}
+  .count{color:var(--faint);font-family:var(--mono);font-size:12px;white-space:nowrap}
+  .list{overflow-y:auto;padding:18px 24px 60px;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+    margin-bottom:14px;cursor:pointer;transition:border-color .12s,transform .12s}
+  .card:hover{border-color:#3a4147;transform:translateY(-1px)}
+  .card .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card .title{font-weight:600;font-size:15px}
+  .card .when{color:var(--faint);font-family:var(--mono);font-size:12px}
+  .card .dur{color:var(--dim);font-family:var(--mono);font-size:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border-radius:20px;
+    border:1px solid var(--line);background:var(--panel2)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.known .d{background:var(--known)}
+  .chip.unknown .d{background:var(--unknown)}
+  .chip.known{color:#cfeede}
+  .chip.unknown{color:#e6bcb0}
+  .loc{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--amber2);
+    font-family:var(--mono)}
+  .conf{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);
+    border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:2px}
+  .summary{color:var(--dim);margin-top:10px;font-size:13.5px}
+  .empty{color:var(--faint);text-align:center;padding:60px;font-family:var(--mono)}
+  /* detail drawer */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.15s;z-index:20}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:min(720px,94vw);background:var(--panel);
+    border-left:1px solid var(--line);transform:translateX(100%);transition:transform .2s ease;
+    z-index:30;display:flex;flex-direction:column}
+  .drawer.on{transform:none}
+  .dhead{padding:18px 22px;border-bottom:1px solid var(--line)}
+  .dhead .x{float:right;border:none;background:none;color:var(--dim);font-size:22px;cursor:pointer;line-height:1}
+  .dhead h3{margin:0 0 4px;font-size:18px}
+  .field{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim)}
+  .field label{color:var(--faint);font-family:var(--mono);font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;width:74px;flex:none}
+  .field input,.field textarea,.field select{flex:1;background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:7px 10px;font-family:var(--sans);font-size:13px}
+  .field textarea{resize:vertical;min-height:44px}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--amber)}
+  audio{width:100%;margin-top:12px}
+  .saved{color:var(--green);font-size:11px;font-family:var(--mono);opacity:0;transition:.2s}
+  .saved.on{opacity:1}
+  .transcript{overflow-y:auto;padding:14px 22px 40px;min-height:0}
+  .turn{display:flex;gap:12px;padding:7px 0}
+  .turn .t{font-family:var(--mono);font-size:11px;color:var(--faint);width:46px;flex:none;
+    cursor:pointer;padding-top:2px}
+  .turn .t:hover{color:var(--amber2)}
+  .turn .sp{font-weight:600;font-size:12px;width:88px;flex:none}
+  .turn .sp.known{color:var(--known)}
+  .turn .sp.unknown{color:var(--unknown)}
+  .turn .tx{flex:1;color:var(--ink)}
+  .spkedit{padding:10px 22px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    background:var(--panel2);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .spkedit small{color:var(--faint);font-family:var(--mono);font-size:11px}
+  .spkedit .pair{display:flex;align-items:center;gap:6px}
+  .spkedit input{background:var(--panel);border:1px solid var(--line);border-radius:7px;color:var(--ink);
+    padding:5px 8px;font-size:12px;width:110px}
+  .btn{background:var(--amber);color:#0d0f10;border:none;border-radius:8px;padding:7px 13px;font-weight:600;
+    cursor:pointer;font-size:12px}
+  .btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><h1>Wonder<span class="dot">·</span>stand</h1></div>
+    <div class="brand" style="margin-top:-18px"><small id="stat">loading…</small></div>
+    <h2>Voices</h2>
+    <div class="people" id="people"></div>
+    <div class="side-foot">localhost · <span id="scount">0</span> recordings</div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" placeholder="Search summaries, transcripts, people, locations…" autocomplete="off">
+      </div>
+      <div class="filterchip" id="fchip">filtered to <b id="fname"></b> <button id="fclear">×</button></div>
+      <div class="count" id="rescount"></div>
+    </div>
+    <div class="list" id="list"></div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="drawer" id="drawer">
+  <div class="dhead">
+    <button class="x" id="dx">×</button>
+    <h3 id="dtitle">—</h3>
+    <div class="field"><label>When</label><span id="dwhen" style="font-family:var(--mono)"></span></div>
+    <div class="field"><label>Location</label>
+      <input id="dloc" placeholder="e.g. Mom's house, Auburndale FL">
+      <select id="dconf" title="confidence">
+        <option value="">—</option><option>confirmed</option><option>likely</option>
+        <option>guess</option>
+      </select>
+    </div>
+    <div class="field"><label>Summary</label><textarea id="dsum" placeholder="One-line summary"></textarea></div>
+    <div class="field" style="justify-content:flex-end">
+      <span class="saved" id="dsaved">saved ✓</span>
+      <button class="btn" id="dsave">Save</button>
+    </div>
+    <audio id="daudio" controls preload="none"></audio>
+  </div>
+  <div class="spkedit" id="spkedit"></div>
+  <div class="transcript" id="transcript"></div>
+</div>
+
+<script>
+const AV_COLORS=["#e8a34a","#5bb98b","#6ba7d6","#c98bd6","#d6976b","#7bc3b0","#d67b93","#9ba7e8"];
+function colorFor(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return AV_COLORS[h%AV_COLORS.length];}
+function initials(n){return n.replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'?';}
+function fmtDur(s){s=Math.round(s);const m=Math.floor(s/60),ss=s%60;return m+':'+String(ss).padStart(2,'0');}
+function fmtDate(iso){const d=new Date(iso);if(isNaN(d))return iso;return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
+function fmtT(s){s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+let STATE={people:[],sessions:[]}, FILTER=null, Q="", CUR=null;
+
+async function load(){
+  const r=await fetch('/api/state'); STATE=await r.json();
+  document.getElementById('stat').textContent=STATE.people.length+' profiles · '+STATE.sessions.length+' recordings';
+  document.getElementById('scount').textContent=STATE.sessions.length;
+  renderPeople(); render();
+}
+
+function renderPeople(){
+  const el=document.getElementById('people'); el.innerHTML='';
+  const all=document.createElement('div');
+  all.className='person allrow'+(FILTER===null?' active':'');
+  all.innerHTML=`<div class="avatar" style="background:#3a4147;color:#e9e6df">✳</div>
+    <div class="meta"><div class="nm">All voices</div><div class="sub">${STATE.sessions.length} recordings</div></div>`;
+  all.onclick=()=>{FILTER=null;renderPeople();render();};
+  el.appendChild(all);
+
+  for(const p of STATE.people){
+    const d=document.createElement('div');
+    d.className='person'+(FILTER===p.name?' active':'');
+    const col=colorFor(p.name);
+    d.innerHTML=`<div class="avatar" style="background:${col}">${initials(p.name)}</div>
+      <div class="meta"><div class="nm">${p.name}
+        <button class="rename-btn" title="rename">edit</button></div>
+        <div class="sub">${p.enrolled_seconds}s enrolled</div></div>
+      <div class="cnt">${p.session_count}</div>`;
+    d.onclick=(e)=>{ if(e.target.classList.contains('rename-btn')){renamePerson(p.name);return;}
+      FILTER=(FILTER===p.name?null:p.name);renderPeople();render(); };
+    el.appendChild(d);
+  }
+}
+
+async function renamePerson(old){
+  const nn=prompt('Rename voice profile "'+old+'" to:',old); if(!nn||nn===old)return;
+  await fetch('/api/person/rename',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({old,new:nn})});
+  if(FILTER===old)FILTER=nn; await load();
+}
+
+function matches(s){
+  if(FILTER && !s.participants.some(p=>p.name===FILTER))return false;
+  if(Q && !s._search.includes(Q))return false;
+  return true;
+}
+
+function render(){
+  const list=document.getElementById('list'); list.innerHTML='';
+  const rows=STATE.sessions.filter(matches);
+  document.getElementById('rescount').textContent=rows.length+' of '+STATE.sessions.length;
+  const fc=document.getElementById('fchip');
+  if(FILTER){fc.style.display='flex';document.getElementById('fname').textContent=FILTER;}else fc.style.display='none';
+  if(!rows.length){list.innerHTML='<div class="empty">no recordings match</div>';return;}
+  for(const s of rows){
+    const c=document.createElement('div'); c.className='card'; c.onclick=()=>openSession(s);
+    const chips=s.participants.map(p=>`<span class="chip ${p.known?'known':'unknown'}">
+      <span class="d"></span>${p.name==='UNKNOWN'?'Unidentified':p.name}
+      <span style="color:var(--faint);font-family:var(--mono)">${fmtDur(p.seconds)}</span></span>`).join('');
+    const loc=s.location?`<span class="loc">📍 ${s.location}${s.location_confidence?`<span class="conf">${s.location_confidence}</span>`:''}</span>`:'';
+    c.innerHTML=`<div class="row1"><span class="title">${s.title}</span>
+        <span class="when">${fmtDate(s.date)}</span><span class="dur">· ${fmtDur(s.duration)}</span>
+        ${loc}</div>
+      <div class="chips">${chips}</div>
+      ${s.summary?`<div class="summary">${s.summary}</div>`:''}`;
+    list.appendChild(c);
+  }
+}
+
+async function openSession(s){
+  CUR=s;
+  document.getElementById('dtitle').textContent=s.title;
+  document.getElementById('dwhen').textContent=fmtDate(s.date)+'  ·  '+fmtDur(s.duration);
+  document.getElementById('dloc').value=s.location||'';
+  document.getElementById('dconf').value=s.location_confidence||'';
+  document.getElementById('dsum').value=s.summary||'';
+  const au=document.getElementById('daudio');
+  if(s.has_audio){au.style.display='';au.src='/api/audio/'+encodeURIComponent(s.id);}else{au.style.display='none';au.removeAttribute('src');}
+  document.getElementById('scrim').classList.add('on');
+  document.getElementById('drawer').classList.add('on');
+  document.getElementById('transcript').innerHTML='<div class="empty">loading transcript…</div>';
+  document.getElementById('spkedit').innerHTML='';
+  const r=await fetch('/api/session/'+encodeURIComponent(s.id)); const d=await r.json();
+  renderTranscript(d,s);
+}
+
+function renderTranscript(d,s){
+  // speaker rename controls
+  const raws=[]; for(const seg of d.segments){if(!raws.includes(seg.speaker))raws.push(seg.speaker);}
+  const known=new Set(STATE.people.map(p=>p.name));
+  const se=document.getElementById('spkedit');
+  se.innerHTML='<small>label speakers:</small>'+raws.map(rw=>{
+    const disp=(d.meta.speaker_names&&d.meta.speaker_names[rw])||rw;
+    return `<span class="pair"><span style="color:${colorFor(disp)}">●</span>
+      <input data-raw="${rw}" value="${disp}" placeholder="${rw}"></span>`;
+  }).join('')+'<button class="btn ghost" id="spksave">Apply</button>';
+  document.getElementById('spksave').onclick=async()=>{
+    const map={}; se.querySelectorAll('input').forEach(i=>{const v=i.value.trim();if(v&&v!==i.dataset.raw)map[i.dataset.raw]=v;});
+    await fetch('/api/session/'+encodeURIComponent(s.id),{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({speaker_names:map})});
+    await load(); const ns=STATE.sessions.find(x=>x.id===s.id); if(ns)openSession(ns);
+  };
+  const tr=document.getElementById('transcript'); tr.innerHTML='';
+  const au=document.getElementById('daudio');
+  for(const seg of d.segments){
+    const disp=seg.display_speaker||seg.speaker;
+    const kn=known.has(disp);
+    const row=document.createElement('div'); row.className='turn';
+    row.innerHTML=`<span class="t">${fmtT(seg.start)}</span>
+      <span class="sp ${kn?'known':'unknown'}" style="${kn?'color:'+colorFor(disp):''}">${disp==='UNKNOWN'?'—':disp}</span>
+      <span class="tx">${seg.text}</span>`;
+    row.querySelector('.t').onclick=()=>{if(au.src){au.currentTime=seg.start;au.play();}};
+    tr.appendChild(row);
+  }
+}
+
+async function saveMeta(){
+  if(!CUR)return;
+  const body={location:document.getElementById('dloc').value,
+    location_confidence:document.getElementById('dconf').value,
+    summary:document.getElementById('dsum').value};
+  await fetch('/api/session/'+encodeURIComponent(CUR.id),{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const sv=document.getElementById('dsaved'); sv.classList.add('on'); setTimeout(()=>sv.classList.remove('on'),1400);
+  Object.assign(CUR,body);
+  const ns=STATE.sessions.find(x=>x.id===CUR.id); if(ns)Object.assign(ns,body); render();
+}
+function closeDrawer(){document.getElementById('scrim').classList.remove('on');
+  document.getElementById('drawer').classList.remove('on');
+  const au=document.getElementById('daudio');au.pause();}
+
+document.getElementById('q').addEventListener('input',e=>{Q=e.target.value.trim().toLowerCase();render();});
+document.getElementById('dx').onclick=closeDrawer;
+document.getElementById('scrim').onclick=closeDrawer;
+document.getElementById('fclear').onclick=()=>{FILTER=null;renderPeople();render();};
+document.getElementById('dsave').onclick=saveMeta;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+load();
+</script>
+</body>
+</html>

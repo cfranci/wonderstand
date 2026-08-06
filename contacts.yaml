@@ -1,0 +1,45 @@
+# Wonderstand contacts policy
+# Each top-level key (except `defaults` and `TWO_PARTY_STATES`) is an
+# E.164 phone number or email of a counterparty. `consent` is one of:
+#   full            -> always tier A
+#   transcript_only -> always tier B
+#   none            -> refuse recording (raises RecordingRefused)
+#   default         -> fall through to defaults block
+
+"+15551234567":
+  name: "Maria Lopez"
+  consent: full
+
+"+14155557890":
+  name: "Acme Legal"
+  consent: none
+
+"+12025550199":
+  name: "Sam (interview source)"
+  consent: transcript_only
+
+"+13105550111":
+  name: "Default Jane"
+  consent: default
+
+"alex@example.com":
+  name: "Alex Kim"
+  consent: full
+
+defaults:
+  unknown_two_party: B
+  unknown_one_party: A
+
+TWO_PARTY_STATES:
+  - CA
+  - FL
+  - IL
+  - MA
+  - MD
+  - MT
+  - NH
+  - PA
+  - WA
+  - CT
+  - DE
+  - HI

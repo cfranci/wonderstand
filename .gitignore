@@ -32,3 +32,9 @@ voice_profiles/profiles.json
 .uploaded_memos
 com.wonderstand.ingest.plist
 upload_new_memos.sh
+node_modules/
+.next/
+.open-next/
+dist/
+*.tsbuildinfo
+*.log

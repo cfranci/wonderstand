@@ -41,12 +41,13 @@ class MeetingIntelligence:
     """Extracts structured meeting notes from fused segments in real time."""
 
     def __init__(self, llm_model=None, llm_tokenizer=None, gpu_lock=None,
-                 output_path=None, speakers=None):
+                 output_path=None, speakers=None, extraction_batch_size=None):
         self._llm_model = llm_model
         self._llm_tokenizer = llm_tokenizer
         self.gpu_lock = gpu_lock
         self.output_path = output_path or "output/meeting_notes.md"
         self.speakers = speakers or set()
+        self._extraction_batch_size = extraction_batch_size or EXTRACTION_BATCH_SIZE
 
         # Accumulated structured data
         self.topics = []          # {time, title, points: [], speaker}
@@ -107,7 +108,7 @@ class MeetingIntelligence:
                 if spk and spk != "UNKNOWN":
                     self.speakers.add(spk)
 
-        if len(self._pending_segments) >= EXTRACTION_BATCH_SIZE:
+        if len(self._pending_segments) >= self._extraction_batch_size:
             self._extract_batch(realtime=realtime)
 
     def flush(self):

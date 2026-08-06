@@ -215,6 +215,51 @@ class SpeakerDiarizer:
         container.close()
         return np.concatenate(all_samples) if all_samples else np.array([], dtype=np.float32)
 
+    def process_wav(self, wav_path, time_offset=0.0):
+        """Run diarization on a single WAV file for incremental/streaming use.
+
+        Unlike process() which takes a full video, this works on individual
+        WAV chunks recorded by live_capture. Segments are accumulated so
+        get_speaker() works across all processed chunks.
+
+        Args:
+            wav_path: Path to WAV file (16kHz, mono, pcm_s16le).
+            time_offset: Added to all timestamps for absolute timing.
+
+        Returns:
+            List of (start, end, speaker) tuples for this chunk.
+        """
+        if self._pipeline is None:
+            self.load_model()
+
+        kwargs = {}
+        if self.num_speakers is not None:
+            kwargs["num_speakers"] = self.num_speakers
+
+        result = self._pipeline(wav_path, **kwargs)
+        diarization = getattr(result, "speaker_diarization", result)
+
+        raw_segments = []
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            raw_segments.append((
+                turn.start + time_offset,
+                turn.end + time_offset,
+                speaker,
+            ))
+
+        merged = self._merge_segments(raw_segments)
+
+        # Apply speaker name mapping
+        mapped = [
+            (s, e, self.speaker_map.get(spk, spk))
+            for s, e, spk in merged
+        ]
+
+        # Accumulate for get_speaker() lookups
+        self.segments.extend(mapped)
+
+        return mapped
+
     def get_speaker(self, start_time, end_time):
         """Find the dominant speaker for a given time range.
 

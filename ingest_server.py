@@ -16,8 +16,10 @@ Endpoints:
     GET  /health          — Simple health check
 """
 import argparse
+import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -26,37 +28,110 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
+SAFE_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]*\.(m4a|wav|mp3|caf|qta|opus|aiff|flac)$")
+RESERVED_NAMES = {".seen", ".processed_recordings", ".uploaded_memos", ".DS_Store"}
+
+
+def _safe_filename(raw: str) -> str:
+    """Reject anything that could clobber internal state files. Returns a safe
+    name or a server-generated fallback if the input is malformed/reserved."""
+    name = Path(raw or "").name
+    if not name or name.startswith(".") or name in RESERVED_NAMES or not SAFE_FILENAME_RE.match(name):
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        return f"memo_{ts}.m4a"
+    return name
+
 BASE_DIR = Path(__file__).parent
 INBOX_DIR = BASE_DIR / "inbox"
 PROCESSED_FILE = BASE_DIR / ".processed_recordings"
 OUTPUT_DIR = BASE_DIR / "output"
+SPINE_PATH = BASE_DIR / "events.ndjson"
+CONTACTS_PATH = BASE_DIR / "contacts.yaml"
+VOICE_PROFILES_DIR = BASE_DIR / "voice_profiles"
 
 INBOX_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# Always-on capture layer extensions (additive — /upload still works unchanged).
+from spine import EventSpine
+import policy_resolver
+
+SPINE = EventSpine(SPINE_PATH)
+try:
+    CONTACTS = policy_resolver.load_contacts(CONTACTS_PATH)
+except Exception as e:
+    print(f"[Ingest] contacts.yaml load failed ({e}); using empty contacts")
+    CONTACTS = {"defaults": {"unknown_two_party": "B", "unknown_one_party": "A"}}
+
+# Guard against accidental API billing — claude work must subprocess `claude` CLI.
+if os.environ.get("ANTHROPIC_API_KEY"):
+    print("[Ingest] WARNING: ANTHROPIC_API_KEY is set; the LLM path must NOT use this.")
+
 
 class IngestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        if self.path != "/upload":
-            self.send_error(404)
+        if self.path == "/upload":
+            self._handle_upload(sidecar=None)
             return
+        if self.path == "/ingest":
+            sidecar = self._read_sidecar()
+            self._handle_upload(sidecar=sidecar)
+            return
+        self.send_error(404)
 
+    def _read_sidecar(self) -> dict:
+        """Sidecar JSON describes the recording context: counterparties, outbound flag,
+        calendar event snapshot frozen at record-start. Sent base64-encoded in X-Sidecar
+        header to keep the multipart story simple for the iOS Shortcut."""
+        raw = self.headers.get("X-Sidecar", "")
+        if not raw:
+            return {}
+        try:
+            return json.loads(base64.b64decode(raw))
+        except Exception as e:
+            print(f"[Ingest] sidecar parse failed: {e}")
+            return {}
+
+    def _handle_upload(self, sidecar):
         content_length = int(self.headers.get("Content-Length", 0))
         if content_length == 0:
             self.send_error(400, "No data")
             return
 
-        # Get filename from header or generate one
-        filename = self.headers.get("X-Filename", "")
-        if not filename:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"memo_{ts}.m4a"
-
-        # Sanitize filename
-        filename = Path(filename).name
+        filename = _safe_filename(self.headers.get("X-Filename", ""))
         filepath = INBOX_DIR / filename
 
-        # Save the file
+        # Resolve policy BEFORE persisting the body to disk. For consent=none we
+        # never want the audio touching durable storage. Drain the request body
+        # into a bounded memory buffer so we can still 403 cleanly.
+        decision = None
+        if sidecar:
+            try:
+                decision = policy_resolver.resolve(
+                    counterparties=sidecar.get("counterparties", []),
+                    outbound=bool(sidecar.get("outbound", False)),
+                    contacts=CONTACTS,
+                    chase_state=sidecar.get("chase_state", "FL"),
+                )
+            except policy_resolver.RecordingRefused as e:
+                SPINE.append("capture.refused", {
+                    "filename": filename,
+                    "sidecar": sidecar,
+                    "reason": str(e),
+                })
+                # Drain the body off the socket without persisting it.
+                remaining = content_length
+                while remaining > 0:
+                    chunk = self.rfile.read(min(8192, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                self.send_response(403)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "refused", "reason": str(e)}).encode())
+                return
+
         with open(filepath, "wb") as f:
             remaining = content_length
             while remaining > 0:
@@ -69,8 +144,14 @@ class IngestHandler(BaseHTTPRequestHandler):
         size_mb = filepath.stat().st_size / (1024 * 1024)
         print(f"[Ingest] Received: {filename} ({size_mb:.1f} MB)")
 
-        # Trigger processing in background
-        threading.Thread(target=process_file, args=(filepath,), daemon=True).start()
+        event_id = SPINE.append("capture.started", {
+            "filename": filename,
+            "size_mb": round(size_mb, 1),
+            "sidecar": sidecar or {},
+            "policy": decision,
+        })
+
+        threading.Thread(target=process_file, args=(filepath, event_id, decision), daemon=True).start()
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -79,6 +160,8 @@ class IngestHandler(BaseHTTPRequestHandler):
             "status": "received",
             "filename": filename,
             "size_mb": round(size_mb, 1),
+            "event_id": event_id,
+            "policy": decision,
         }).encode())
 
     def do_GET(self):
@@ -111,12 +194,11 @@ class IngestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def process_file(filepath):
-    """Run Wonderstand pipeline on a single file."""
+def process_file(filepath, capture_event_id=None, policy_decision=None):
+    """Run Wonderstand pipeline on a single file. Emits spine events around the work."""
     filename = filepath.name
     basename = filepath.stem
 
-    # Check if already processed
     processed = set()
     if PROCESSED_FILE.exists():
         processed = set(PROCESSED_FILE.read_text().strip().split("\n"))
@@ -126,6 +208,11 @@ def process_file(filepath):
 
     output_json = OUTPUT_DIR / f"{basename}.json"
     output_notes = OUTPUT_DIR / f"{basename}_notes.md"
+
+    SPINE.append("transcript.started", {
+        "filename": filename,
+        "capture_event_id": capture_event_id,
+    })
 
     print(f"[Ingest] Processing: {filename}...")
     venv_python = BASE_DIR / "venv" / "bin" / "python"
@@ -143,15 +230,54 @@ def process_file(filepath):
     try:
         result = subprocess.run(cmd, cwd=str(BASE_DIR), capture_output=True, text=True, timeout=1800)
         if result.returncode == 0:
-            # Mark as processed
+            import fcntl as _fcntl
             with open(PROCESSED_FILE, "a") as f:
-                f.write(filename + "\n")
+                _fcntl.flock(f.fileno(), _fcntl.LOCK_EX)
+                try:
+                    f.write(filename + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    _fcntl.flock(f.fileno(), _fcntl.LOCK_UN)
             print(f"[Ingest] Done: {filename} -> {output_notes.name}")
+            SPINE.append("transcript.completed", {
+                "filename": filename,
+                "capture_event_id": capture_event_id,
+                "output_notes": str(output_notes.name),
+            })
         else:
             print(f"[Ingest] Failed: {filename}")
-            print(result.stderr[-500:] if result.stderr else "no stderr")
+            stderr_tail = result.stderr[-500:] if result.stderr else "no stderr"
+            print(stderr_tail)
+            SPINE.append("error", {
+                "where": "transcript",
+                "filename": filename,
+                "capture_event_id": capture_event_id,
+                "stderr_tail": stderr_tail,
+            })
     except subprocess.TimeoutExpired:
         print(f"[Ingest] Timeout: {filename} (>30 min)")
+        SPINE.append("error", {
+            "where": "transcript_timeout",
+            "filename": filename,
+            "capture_event_id": capture_event_id,
+        })
+    finally:
+        # Tier B is a consent guarantee — audio MUST be shredded whether or not
+        # transcription succeeded. If transcription failed, we lose the data, which
+        # is the correct behavior given the consent constraint.
+        if policy_decision and policy_decision.get("tier") == "B":
+            try:
+                if filepath.exists():
+                    filepath.unlink()
+                SPINE.append("audio.shredded", {
+                    "filename": filename,
+                    "capture_event_id": capture_event_id,
+                    "reason": "tier_B_transcript_only",
+                })
+                print(f"[Ingest] Tier B: shredded audio for {filename}")
+            except OSError as e:
+                SPINE.append("error", {"where": "tier_b_shred", "filename": filename, "err": str(e)})
 
 
 def process_inbox():

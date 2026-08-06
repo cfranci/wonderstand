@@ -8,3 +8,4 @@ Pillow
 tqdm
 opencv-python
 pyannote.audio
+notion-client

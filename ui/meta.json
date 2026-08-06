@@ -1,0 +1,57 @@
+{
+  "people": {},
+  "sessions": {
+    "today-0721~1351_16min_diar.json": {
+      "title": "Larry \u2014 afternoon",
+      "date": "2026-07-21T13:51:30",
+      "audio": "/Users/cf/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/20260721 135130-C2987C3E.qta",
+      "source": "20260721 135130-C2987C3E.qta",
+      "summary": "Larry pitches Chase on building a dating/companionship app \u2014 framed as a marketing play aimed at older people wanting companionship over hookups. Chase (just back from Miami, 5 yrs in FL) offers to build whatever Larry wants but is honest about how hard the dating-app space is. A third voice joins briefly. Later the recording drifts into a family gas-smell/maintenance issue (Rihanna, grandma).",
+      "speaker_names": {
+        "SPEAKER_00": "Chase",
+        "SPEAKER_01": "Larry",
+        "SPEAKER_02": "Unknown"
+      },
+      "location": "Tampa Bay area, FL",
+      "location_confidence": "likely"
+    },
+    "today-0721~1437_5min_diar.json": {
+      "title": "Shaylinn \u2014 short-term rentals chat",
+      "date": "2026-07-21T14:37:47",
+      "audio": "/Users/cf/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/20260721 143747-34A8DA7D.qta",
+      "source": "20260721 143747-34A8DA7D.qta",
+      "speaker_names": {
+        "SPEAKER_00": "Shaylinn"
+      },
+      "summary": "Talking shop with a fellow STR host \u2014 Guesty as booking engine/channel manager, custom-built site, automated messaging & cleaning. You mention heading to DC to sell a property or two and coming back for your birthday; offer to pass along the Guesty account.",
+      "location": "Tampa Bay / Sarasota area, FL",
+      "location_confidence": "likely"
+    },
+    "today-0721~1640_28min_diar.json": {
+      "title": "Shaylinn \u2014 late afternoon",
+      "date": "2026-07-21T16:40:57",
+      "audio": "/Users/cf/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/20260721 164057-E4B8A3A0.qta",
+      "source": "20260721 164057-E4B8A3A0.qta",
+      "location": "Sarasota / Tampa Bay area, FL",
+      "location_confidence": "likely",
+      "summary": "Business meeting with Shaylinn: forming an LLC in the next 24\u201348h, a profit-share + low monthly retainer structure, and plugging her property-management venture into the Ilios system (the ~20% owner model, VAs, automation). Properties/targets around Sarasota & Tampa. The back half drifts into a loud social scene (kids, people taking photos, police/security around).",
+      "speaker_names": {
+        "SPEAKER_01": "Unknown"
+      }
+    },
+    "today-0721~2051_25min_diar.json": {
+      "title": "Shaylinn \u2014 evening",
+      "date": "2026-07-21T20:51:49",
+      "audio": "/Users/cf/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/20260721 205149-71DE62D5.qta",
+      "source": "20260721 205149-71DE62D5.qta",
+      "location": "Tampa Bay / Sarasota area, FL (large venue)",
+      "location_confidence": "likely",
+      "summary": "Evening continuation of the Shaylinn collaboration in a busier setting (a few other voices, incl. a \"Chris\"; a venue with an auditorium/courtyard). STR operations in the weeds: sharing Notion docs, guest-messaging templates, cleaning-team systems & calendars, and automating with Zapier/n8n. You offer to help build systems / a website.",
+      "speaker_names": {
+        "SPEAKER_00": "Unknown",
+        "SPEAKER_01": "Unknown",
+        "SPEAKER_03": "Unknown"
+      }
+    }
+  }
+}
