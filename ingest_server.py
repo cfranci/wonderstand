@@ -301,7 +301,7 @@ def main():
         process_inbox()
         return
 
-    server = HTTPServer(("0.0.0.0", args.port), IngestHandler)
+    server = HTTPServer((os.environ.get("INGEST_HOST","0.0.0.0"), args.port), IngestHandler)
     print(f"[Ingest] Wonderstand ingest server listening on port {args.port}")
     print(f"[Ingest] Upload: POST http://localhost:{args.port}/upload")
     print(f"[Ingest] Status: GET  http://localhost:{args.port}/status")
